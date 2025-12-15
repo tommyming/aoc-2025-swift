@@ -44,6 +44,12 @@ struct Day05: AdventDay {
     return fresh
   }
 
+  func part2() async throws -> Int {
+    let (rawRanges, _) = parsed
+    let merged = mergeRanges(rawRanges)
+    return merged.reduce(0) { $0 + ($1.1 - $1.0 + 1) }
+  }
+
   private func mergeRanges(_ ranges: [(Int, Int)]) -> [(Int, Int)] {
     guard !ranges.isEmpty else { return [] }
     let sorted = ranges.sorted { lhs, rhs in
