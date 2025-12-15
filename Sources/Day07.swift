@@ -4,49 +4,51 @@ struct Day07: AdventDay {
   var data: String
 
   func part1() async throws -> Int {
-    countSplits()
+    simulate().splitCount
   }
 
   func part2() async throws -> Int {
-    throw PartUnimplemented(day: day, part: 2)
+    simulate().timelineCount
   }
 
-  private func countSplits() -> Int {
+  private func simulate() -> (splitCount: Int, timelineCount: Int) {
     let (grid, start) = parsedInput
     let height = grid.count
-    guard height > 0 else { return 0 }
+    guard height > 0 else { return (0, 0) }
+    let width = grid[0].count
 
-    var activeColumns: Set<Int> = [start.col]
+    var activeTimelineCounts: [Int: Int] = [start.col: 1]
     var splitCount = 0
 
     var row = start.row + 1
-    while row < height, !activeColumns.isEmpty {
-      var nextColumns = Set<Int>()
-      nextColumns.reserveCapacity(activeColumns.count * 2)
-      for column in activeColumns {
-        guard column >= 0, column < grid[row].count else {
-          continue
-        }
+    while row < height, !activeTimelineCounts.isEmpty {
+      var nextCounts: [Int: Int] = [:]
+      nextCounts.reserveCapacity(activeTimelineCounts.count * 2)
+
+      for (column, timelineCount) in activeTimelineCounts {
+        guard column >= 0, column < width else { continue }
+
         let cell = grid[row][column]
         if cell == "^" {
           splitCount += 1
           let left = column - 1
-          let right = column + 1
           if left >= 0 {
-            nextColumns.insert(left)
+            nextCounts[left, default: 0] += timelineCount
           }
-          if right < grid[row].count {
-            nextColumns.insert(right)
+          let right = column + 1
+          if right < width {
+            nextCounts[right, default: 0] += timelineCount
           }
         } else {
-          nextColumns.insert(column)
+          nextCounts[column, default: 0] += timelineCount
         }
       }
-      activeColumns = nextColumns
+      activeTimelineCounts = nextCounts
       row += 1
     }
 
-    return splitCount
+    let timelineTotal = activeTimelineCounts.values.reduce(0, +)
+    return (splitCount, timelineTotal)
   }
 
   private var parsedInput: (grid: [[Character]], start: (row: Int, col: Int)) {
