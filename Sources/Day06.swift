@@ -5,12 +5,14 @@ struct Day06: AdventDay {
 
   func part1() async throws -> Int {
     parseProblems().reduce(0) { total, problem in
-      total + problem.operation.evaluate(problem.numbers)
+      total + problem.operation.evaluate(problem.topDownNumbers)
     }
   }
 
   func part2() async throws -> Int {
-    throw PartUnimplemented(day: day, part: 2)
+    parseProblems().reduce(0) { total, problem in
+      total + problem.operation.evaluate(problem.rightToLeftNumbers)
+    }
   }
 
   private func parseProblems() -> [Problem] {
@@ -67,13 +69,31 @@ struct Day06: AdventDay {
         }
       }
 
+      var columnNumbers: [Int] = []
+      columnNumbers.reserveCapacity(endColumn - column)
+      for colIndex in stride(from: endColumn - 1, through: column, by: -1) {
+        var digits: [Character] = []
+        digits.reserveCapacity(operatorRowIndex)
+        for row in 0..<operatorRowIndex {
+          let ch = paddedRows[row][colIndex]
+          if ch == " " { continue }
+          digits.append(ch)
+        }
+        guard !digits.isEmpty else { continue }
+        let token = String(digits)
+        guard let value = Int(token) else {
+          fatalError("Unexpected digit sequence: \(token)")
+        }
+        columnNumbers.append(value)
+      }
+
       let operatorSlice = paddedRows[operatorRowIndex][column..<endColumn]
       let operatorToken = String(operatorSlice).trimmingCharacters(in: .whitespaces)
       guard let operation = Operation(token: operatorToken) else {
         fatalError("Unexpected operator token: \(operatorToken)")
       }
 
-      problems.append(Problem(numbers: numbers, operation: operation))
+      problems.append(Problem(topDownNumbers: numbers, rightToLeftNumbers: columnNumbers, operation: operation))
       column = endColumn
     }
 
@@ -83,7 +103,8 @@ struct Day06: AdventDay {
 
 private extension Day06 {
   struct Problem {
-    let numbers: [Int]
+    let topDownNumbers: [Int]
+    let rightToLeftNumbers: [Int]
     let operation: Operation
   }
 
