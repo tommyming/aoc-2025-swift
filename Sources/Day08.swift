@@ -8,7 +8,7 @@ struct Day08: AdventDay {
   }
 
   func part2() async throws -> Int {
-    throw PartUnimplemented(day: day, part: 2)
+    try solveUntilSingleCircuit()
   }
 
   func solve(connectingPairs: Int) throws -> Int {
@@ -27,6 +27,26 @@ struct Day08: AdventDay {
 
     let sizes = dsu.collectComponentSizes()
     return productOfLargestComponents(componentSizes: sizes)
+  }
+
+  private func solveUntilSingleCircuit() throws -> Int {
+    let points = try parsePoints()
+    guard points.count >= 2 else {
+      return points.first?.x ?? 0
+    }
+
+    let edges = computeEdges(for: points)
+    var dsu = DisjointSet(count: points.count)
+
+    for edge in edges {
+      if dsu.union(edge.a, edge.b), dsu.componentCount == 1 {
+        let lhs = points[edge.a].x
+        let rhs = points[edge.b].x
+        return lhs * rhs
+      }
+    }
+
+    throw InputError.unableToConnect
   }
 
   private func parsePoints() throws -> [Point] {
@@ -92,6 +112,7 @@ struct Day08: AdventDay {
 private extension Day08 {
   enum InputError: Error {
     case invalidLine(String)
+    case unableToConnect
   }
 
   struct Point {
@@ -116,10 +137,12 @@ private extension Day08 {
   struct DisjointSet {
     private var parent: [Int]
     private var size: [Int]
+    private(set) var componentCount: Int
 
     init(count: Int) {
       parent = Array(0..<count)
       size = Array(repeating: 1, count: count)
+      componentCount = count
     }
 
     mutating func find(_ node: Int) -> Int {
@@ -130,15 +153,18 @@ private extension Day08 {
       return parent[node]
     }
 
-    mutating func union(_ lhs: Int, _ rhs: Int) {
+    @discardableResult
+    mutating func union(_ lhs: Int, _ rhs: Int) -> Bool {
       var rootA = find(lhs)
       var rootB = find(rhs)
-      if rootA == rootB { return }
+      if rootA == rootB { return false }
       if size[rootA] < size[rootB] {
         swap(&rootA, &rootB)
       }
       parent[rootB] = rootA
       size[rootA] += size[rootB]
+      componentCount -= 1
+      return true
     }
 
     mutating func collectComponentSizes() -> [Int] {
