@@ -32,7 +32,48 @@ struct Day11: AdventDay {
   }
 
   func part2() async throws -> Int {
-    throw PartUnimplemented(day: day, part: 2)
+    let graph = parseGraph()
+    
+    func countPaths(from start: String, to end: String) -> Int {
+      var memo: [String: Int] = [:]
+      
+      func dfs(_ node: String) -> Int {
+        if node == end {
+          return 1
+        }
+        if let cached = memo[node] {
+          return cached
+        }
+        
+        guard let neighbors = graph[node] else {
+          return 0
+        }
+        
+        var total = 0
+        for neighbor in neighbors {
+          total += dfs(neighbor)
+        }
+        
+        memo[node] = total
+        return total
+      }
+      
+      return dfs(start)
+    }
+    
+    // Path 1: svr -> dac -> fft -> out
+    let svrToDac = countPaths(from: "svr", to: "dac")
+    let dacToFft = countPaths(from: "dac", to: "fft")
+    let fftToOut = countPaths(from: "fft", to: "out")
+    let path1 = svrToDac * dacToFft * fftToOut
+    
+    // Path 2: svr -> fft -> dac -> out
+    let svrToFft = countPaths(from: "svr", to: "fft")
+    let fftToDac = countPaths(from: "fft", to: "dac")
+    let dacToOut = countPaths(from: "dac", to: "out")
+    let path2 = svrToFft * fftToDac * dacToOut
+    
+    return path1 + path2
   }
 
   private func parseGraph() -> [String: [String]] {
