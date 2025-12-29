@@ -17,7 +17,15 @@ struct Day10: AdventDay {
   }
 
   func part2() async throws -> Int {
-    throw PartUnimplemented(day: day, part: 2)
+    let machines = parseMachines()
+    var total = 0
+    for machine in machines {
+      let presses = solvePart2(machine: machine)
+      if presses != Int.max {
+        total += presses
+      }
+    }
+    return total
   }
 }
 
@@ -25,13 +33,14 @@ private extension Day10 {
   struct Machine {
     let target: [Bool]
     let buttons: [[Int]]
+    let joltage: [Int]
   }
 
   func parseMachines() -> [Machine] {
     var machines: [Machine] = []
     machines.reserveCapacity(128)
 
-      for rawLine in data.split(whereSeparator: { $0.isNewline }) {
+    for rawLine in data.split(whereSeparator: { $0.isNewline }) {
       let trimmed = rawLine.trimmingCharacters(in: CharacterSet.whitespaces)
       guard !trimmed.isEmpty else { continue }
 
@@ -68,7 +77,15 @@ private extension Day10 {
         index = header.index(after: closing)
       }
 
-      machines.append(Machine(target: target, buttons: buttons))
+      var joltage: [Int] = []
+      if parts.count > 1 {
+        let joltageString = parts[1].dropLast()
+        joltage = joltageString.split(separator: ",").compactMap {
+          Int($0.trimmingCharacters(in: CharacterSet.whitespaces))
+        }
+      }
+
+      machines.append(Machine(target: target, buttons: buttons, joltage: joltage))
     }
 
     return machines
@@ -213,5 +230,150 @@ private extension Day10 {
     }
 
     return minimum
+  }
+
+  func solvePart2(machine: Machine) -> Int {
+    let target = machine.joltage
+    let buttons = machine.buttons
+    let numCounters = target.count
+    let numButtons = buttons.count
+    
+    if numButtons == 0 {
+        return target.allSatisfy { $0 == 0 } ? 0 : Int.max
+    }
+
+    var matrix: [[Double]] = Array(repeating: Array(repeating: 0.0, count: numButtons), count: numCounters)
+    for (j, button) in buttons.enumerated() {
+        for counterIndex in button {
+            if counterIndex < numCounters {
+                matrix[counterIndex][j] = 1.0
+            }
+        }
+    }
+    
+    var rhs = target.map { Double($0) }
+    var pivotRowForColumn = Array(repeating: -1, count: numButtons)
+    var currentRow = 0
+    
+    for col in 0..<numButtons {
+        if currentRow >= numCounters { break }
+        
+        var pivot = -1
+        for row in currentRow..<numCounters {
+            if abs(matrix[row][col]) > 1e-9 {
+                pivot = row
+                break
+            }
+        }
+        
+        if pivot == -1 { continue }
+        
+        if pivot != currentRow {
+            matrix.swapAt(currentRow, pivot)
+            rhs.swapAt(currentRow, pivot)
+        }
+        
+        let pivotVal = matrix[currentRow][col]
+        for j in col..<numButtons {
+            matrix[currentRow][j] /= pivotVal
+        }
+        rhs[currentRow] /= pivotVal
+        
+        for row in 0..<numCounters {
+            if row != currentRow {
+                let factor = matrix[row][col]
+                if abs(factor) > 1e-9 {
+                    for j in col..<numButtons {
+                        matrix[row][j] -= factor * matrix[currentRow][j]
+                    }
+                    rhs[row] -= factor * rhs[currentRow]
+                }
+            }
+        }
+        
+        pivotRowForColumn[col] = currentRow
+        currentRow += 1
+    }
+    
+    for row in currentRow..<numCounters {
+        if abs(rhs[row]) > 1e-9 {
+            return Int.max
+        }
+    }
+    
+    var freeVars: [Int] = []
+    for col in 0..<numButtons {
+        if pivotRowForColumn[col] == -1 {
+            freeVars.append(col)
+        }
+    }
+    
+    var bounds: [Int] = []
+    for freeVarIndex in freeVars {
+        var limit = Int.max
+        for counterIdx in buttons[freeVarIndex] {
+            if counterIdx < target.count {
+                limit = min(limit, target[counterIdx])
+            }
+        }
+        if limit == Int.max { limit = 0 }
+        bounds.append(limit)
+    }
+    
+    var minTotalPresses = Int.max
+    
+    func search(index: Int, currentFreeValues: [Int]) {
+        if index == freeVars.count {
+            var currentSolution = Array(repeating: 0, count: numButtons)
+            for (i, val) in currentFreeValues.enumerated() {
+                currentSolution[freeVars[i]] = val
+            }
+            
+            var possible = true
+            for col in 0..<numButtons {
+                if pivotRowForColumn[col] != -1 {
+                    let row = pivotRowForColumn[col]
+                    var val = rhs[row]
+                    for (i, freeCol) in freeVars.enumerated() {
+                        val -= matrix[row][freeCol] * Double(currentFreeValues[i])
+                    }
+                    
+                    let rounded = round(val)
+                    if abs(val - rounded) < 1e-5 && rounded >= -1e-9 {
+                        currentSolution[col] = Int(rounded)
+                    } else {
+                        possible = false
+                        break
+                    }
+                }
+            }
+            
+            if possible {
+                // Verify non-negative
+                for x in currentSolution {
+                    if x < 0 { possible = false; break }
+                }
+            }
+            
+            if possible {
+                let total = currentSolution.reduce(0, +)
+                if total < minTotalPresses {
+                    minTotalPresses = total
+                }
+            }
+            return
+        }
+        
+        let limit = bounds[index]
+        for val in 0...limit {
+            var nextValues = currentFreeValues
+            nextValues.append(val)
+            search(index: index + 1, currentFreeValues: nextValues)
+        }
+    }
+    
+    search(index: 0, currentFreeValues: [])
+    
+    return minTotalPresses
   }
 }
